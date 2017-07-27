@@ -1,3 +1,4 @@
+[![Stories in Ready](https://badge.waffle.io/luodanwg/DNA.png?label=ready&title=Ready)](https://waffle.io/luodanwg/DNA?utm_source=badge)
 [![Build Status](https://travis-ci.org/DNAProject/DNA.svg?branch=master)](https://travis-ci.org/DNAProject/DNA)
 
 # DNA (Distributed Networks Architecture)
