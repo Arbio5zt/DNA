@@ -40,6 +40,18 @@ func NewBlockchainWithGenesisBlock(defaultBookKeeper []*crypto.PubKey, defaultSt
 	return blockchain, nil
 }
 
+func (bc *Blockchain) SetBlockHeight(height uint32){
+	bc.mutex.Lock()
+	defer bc.mutex.Unlock()
+	bc.BlockHeight = height
+}
+
+func (bc *Blockchain) GetBlockHeight()uint32{
+	bc.mutex.Lock()
+	defer bc.mutex.Unlock()
+	return bc.BlockHeight
+}
+
 func (bc *Blockchain) AddBlock(block *Block) error {
 	log.Debug()
 	bc.mutex.Lock()

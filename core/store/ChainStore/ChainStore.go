@@ -1326,7 +1326,7 @@ func (bd *ChainStore) persistBlocks(ledger *Ledger) {
 		}
 
 		// PersistCompleted event
-		ledger.Blockchain.BlockHeight = block.Blockdata.Height
+		ledger.Blockchain.SetBlockHeight(block.Blockdata.Height)
 		bd.mu.Lock()
 		bd.currentBlockHeight = block.Blockdata.Height
 		bd.mu.Unlock()

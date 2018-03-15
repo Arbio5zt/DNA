@@ -11,12 +11,17 @@ import (
 	"DNA/crypto"
 	"DNA/net"
 	"DNA/net/httpjsonrpc"
+	"DNA/cli/node"
 	"DNA/net/httprestful"
 	"DNA/net/httpwebsocket"
 	"DNA/net/protocol"
+	"DNA/common"
 	"os"
 	"runtime"
 	"time"
+	"fmt"
+	"bytes"
+	"DNA/common/serialization"
 )
 
 const (
@@ -45,6 +50,12 @@ func main() {
 	if len(config.Parameters.BookKeepers) < account.DefaultBookKeeperCount {
 		log.Fatal("At least ", account.DefaultBookKeeperCount, " BookKeepers should be set at config.json")
 		os.Exit(1)
+	}
+
+	blocksFile := "./blocks.dat"
+	var isImportBlocks = false
+	if !common.FileExisted("./Chain") && common.FileExisted(blocksFile){
+		isImportBlocks = true
 	}
 
 	log.Info("0. Loading the Ledger")
@@ -81,6 +92,19 @@ func main() {
 		goto ERROR
 	}
 	ledger.DefaultLedger.Blockchain = blockChain
+	if isImportBlocks{
+		log.Infof("Start ImportBlocks\n")
+		err = importBlocks(blocksFile)
+		if err != nil {
+			log.Errorf("ImportBlocks error %s\n", err)
+			goto ERROR
+		}
+		log.Infof("ImportBlocks complete\n")
+		err = os.Remove(blocksFile)
+		if err != nil {
+			log.Errorf(" os.Remove %s error %s", blocksFile,err)
+		}
+	}
 
 	log.Info("4. Start the P2P networks")
 	// Don't need two return value.
@@ -117,3 +141,59 @@ func main() {
 ERROR:
 	os.Exit(1)
 }
+
+func importBlocks(fileName string) error {
+	file, err := os.OpenFile(fileName, os.O_RDONLY, 0666)
+	if err != nil {
+		return fmt.Errorf("OpenFile %s error %s", fileName, err)
+	}
+	defer file.Close()
+
+	height, err := serialization.ReadUint32(file)
+	if err != nil {
+		return fmt.Errorf("serialization.ReadUint32  block height error %s", err)
+	}
+
+	log.Infof("ImportBlocks TotalBlock:%d\n", height)
+
+	curBlockHeigh := ledger.DefaultLedger.Blockchain.GetBlockHeight()
+	for i := uint32(0); i <= height; i++ {
+		size, err := serialization.ReadUint32(file)
+		if err != nil {
+			return fmt.Errorf("serialization.ReadUint32 block height:%d block size error %s", i, err)
+		}
+		compressData := make([]byte, size, size)
+		_, err = file.Read(compressData)
+		if err != nil {
+			return fmt.Errorf("file read block height %d size %d error %s", i, size, err)
+		}
+
+		if i <= curBlockHeigh {
+			continue
+		}
+
+		blockData, err := node.ZLibUncompress(compressData)
+		if err != nil {
+			return fmt.Errorf("block height %d zlibUncompress error %s", i, err)
+		}
+		block := &ledger.Block{}
+		buf := bytes.NewBuffer(blockData)
+		err = block.Deserialize(buf)
+		if err != nil {
+			return fmt.Errorf("block height %d block.Deserialize error %s", i, err)
+		}
+		err = ledger.DefaultLedger.Blockchain.AddBlock(block)
+		if err != nil {
+			return fmt.Errorf("Blockchain.AddBlock height %d error %s", i, err)
+		}
+		for {
+			time.Sleep(time.Millisecond)
+			h := ledger.DefaultLedger.Blockchain.GetBlockHeight()
+			if h >= i{
+				break
+			}
+		}
+	}
+	return nil
+}
+
